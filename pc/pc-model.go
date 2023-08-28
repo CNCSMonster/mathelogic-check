@@ -2,8 +2,6 @@ package pc
 
 import (
 	"fmt"
-
-	mathelogic "github.com/cncsmonster/mathelogic-check"
 )
 
 // pc只有一种推理规则,蕴含规则 A,A->B
@@ -11,10 +9,14 @@ import (
 // pc只有两大联结词:1.-> 2.!(ps,为了方便打,使用!作为否定联结词)
 // T
 const (
+	// pc唯一推理规则,分离规则 若A,A->B,则B
 	ONLY_ONE_MODUS_PONENS = iota
-	AXIOM_ONE             = iota
-	AXIOM_TWO             = iota
-	AXIOM_TRHEE           = iota
+	// 公理1  (  A->(B->A))
+	AXIOM_ONE
+	// 公理2 （蕴含展开 (A->(B->C)) -> (A->B)->(A->C))
+	AXIOM_TWO
+	// 公理3  (双重否定 (!B->!A)->(A->B))
+	AXIOM_TRHEE
 )
 
 // pc推理语句
@@ -33,6 +35,16 @@ type PCInference struct {
 type PCChecker struct {
 	premise    []string //前提
 	inferences []string //非前提部分推理语句
+	rules      map[int]func(PCInference, *PCChecker) bool
+}
+
+func New() *PCChecker {
+	out := &PCChecker{premise: []string{}, inferences: []string{}, rules: make(map[int]func(PCInference, *PCChecker) bool)}
+	out.rules[ONLY_ONE_MODUS_PONENS] = check_for_modus_penus
+	out.rules[AXIOM_ONE] = check_for_first_axiom
+	out.rules[AXIOM_TWO] = check_for_second_axiom
+	out.rules[AXIOM_TRHEE] = check_for_third_axiom
+	return out
 }
 
 func (pcChecker *PCChecker) Len() int {
@@ -54,12 +66,12 @@ func (pcChecker *PCChecker) Get(index int) string {
 func (pcChecker *PCChecker) PushPremise(premise string) {
 	//
 	pcChecker.premise = append(pcChecker.premise, premise)
-
 }
 
 // 加入推理语句 (加入推理语句之前要先进行检查)
 func (pcChecker *PCChecker) PushInference(inference string) (bool, error) {
-	inferenceStruct := compileInference(inference)
+	inferenceStructp, err := compileInference(inference)
+	inferenceStruct := *inferenceStructp
 	//然后检查inference
 	// TODO
 	ok, err := pcChecker.checkInference(inferenceStruct)
@@ -72,44 +84,7 @@ func (pcChecker *PCChecker) PushInference(inference string) (bool, error) {
 	return ok, err
 }
 
-func (pcChecker *PCChecker) checkInference(inference PCInference) (bool, error) {
-	return false, nil
-}
-
-// /首先对推理语句进行编译成基础语句单元
-func compileInference(inference string) PCInference {
-	return PCInference{}
-}
-
 // 弹出语句
 func (pcChecker *PCChecker) PopInference() {
 	pcChecker.inferences = pcChecker.inferences[:len(pcChecker.inferences)-1]
-}
-
-// 判断两个pc语句是否一致
-func (pcChecker *PCChecker) Equal(inferenceOne, inferenceAnother string) bool {
-	pcinfs1 := compileInference(inferenceOne)
-	pcinfs2 := compileInference(inferenceAnother)
-	if pcinfs1.expr != pcinfs2.expr {
-		return false
-	}
-	if pcinfs1.rule != pcinfs2.rule {
-		return false
-	}
-	if len(pcinfs1.depends) != len(pcinfs2.depends) {
-		return false
-	}
-	for i, v := range pcinfs1.depends {
-		if pcinfs2.depends[i] != v {
-			return false
-		}
-	}
-
-	return true
-}
-
-func init() {
-	// TODO 初始化 操作
-	var m mathelogic.Interface = &PCChecker{}
-	m.PushInference("gg")
 }
