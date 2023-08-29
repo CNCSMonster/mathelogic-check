@@ -20,4 +20,9 @@ func main() {
 	} else {
 		fmt.Println("推理失败")
 	}
+	ok, err = m.PushInference("!B->(A->!B)#1")
+	fmt.Println(ok, err)
+	ok, err = m.PushInference("(A->(B->C))->((A->B)->(A->C)) #2")
+	fmt.Println(ok, err)
+
 }

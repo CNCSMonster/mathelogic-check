@@ -3,7 +3,9 @@ package pc
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
+	"unicode"
 )
 
 func (pcChecker *PCChecker) checkInference(inference PCInference) (bool, error) {
@@ -70,14 +72,125 @@ func check_for_modus_penus(inference PCInference, pcChecker *PCChecker) bool {
 	return false
 }
 
-func check_for_first_axiom(inference PCInference, pcChecer *PCChecker) bool {
-	fmt.Println("check for atom one")
-	return false
+// 分离模式 A->(B->C)中的 A,B,C
+func split_A_B_C(expr string) (A, B, C string, ok bool) {
+	A, B, C = "", "", ""
+	sb := strings.Builder{}
+	state := 0
+	numLeftParenthesis := 0 //自动机使用的参数
+	ok = true
+	fmt.Println("process", expr)
+	for _, c := range expr {
+		switch state {
+		// 获取A
+		case 0:
+			if unicode.IsLetter(c) || c == '!' {
+				sb.WriteRune(c)
+			} else if c == '(' {
+				sb.WriteRune(c)
+				numLeftParenthesis += 1
+			} else if c == ')' && numLeftParenthesis > 0 {
+				sb.WriteRune(c)
+				numLeftParenthesis -= 1
+			} else if c == '-' && numLeftParenthesis == 0 {
+				A = sb.String()
+				sb = strings.Builder{}
+				state = 1
+			} else if c == '-' || c == '>' {
+				sb.WriteRune(c)
+			} else {
+				ok = false
+				break
+			}
+		// A,B中转
+		case 1:
+			if c == '>' {
+				state = 2
+			} else {
+				ok = false
+				break
+			}
+		// 进入(B->A)
+		case 2:
+			if c == '(' {
+				state = 3
+			} else {
+				ok = false
+				break
+			}
+		//准备B
+		case 3:
+			if unicode.IsLetter(c) || c == '!' {
+				sb.WriteRune(c)
+			} else if c == '(' {
+				sb.WriteRune(c)
+				numLeftParenthesis += 1
+			} else if c == ')' && numLeftParenthesis > 0 {
+				sb.WriteRune(c)
+				numLeftParenthesis -= 1
+			} else if c == '-' && numLeftParenthesis == 0 {
+				B = sb.String()
+				sb = strings.Builder{}
+				state = 4
+			} else if c == '-' || c == '>' {
+				sb.WriteRune(c)
+			} else {
+				ok = false
+				break
+			}
+		//B和第二个A的中转
+		case 4:
+			if c == '>' {
+				state = 5
+			} else {
+				ok = false
+				break
+			}
+		case 5:
+			if unicode.IsLetter(c) || c == '!' {
+				sb.WriteRune(c)
+			} else if c == '(' {
+				sb.WriteRune(c)
+				numLeftParenthesis += 1
+			} else if c == ')' && numLeftParenthesis > 0 {
+				sb.WriteRune(c)
+				numLeftParenthesis -= 1
+			} else if c == ')' && numLeftParenthesis == 0 {
+				C = sb.String()
+				state = 6
+			} else if c == '-' && numLeftParenthesis == 0 {
+				ok = false
+				break
+			} else if c == '-' || c == '>' {
+				sb.WriteRune(c)
+			} else {
+				ok = false
+				break
+			}
+		case 6:
+			// 到达终结状态后后面不应该存在字符
+			ok = false
+			break
+		}
+	}
+	return A, B, C, ok
 }
 
-func check_for_second_axiom(inference PCInference, pcChecer *PCChecker) bool {
-	fmt.Println("check for axiom two")
-	return false
+// 第一公理: A->(B->A)
+// 规定文法 A,B 属于 [A-Ba-b]*
+func check_for_first_axiom(inference PCInference, pcChecer *PCChecker) bool {
+	// fmt.Println("check for atom one")
+	A, B, C, ok := split_A_B_C(inference.expr)
+	if !ok {
+		return false
+	}
+	fmt.Println(A, B, C)
+	// 对分离出来的三个成分进行检查,
+	if A != C {
+		return false
+	}
+	re := regexp.MustCompile("^[A-Za-z()->!]+$")
+	return re.MatchString(A) && re.MatchString(B) && re.MatchString(C)
 }
 
 func check_for_third_axiom(inference PCInference, pcChecer *PCChecker) bool {

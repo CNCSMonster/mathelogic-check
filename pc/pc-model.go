@@ -71,6 +71,9 @@ func (pcChecker *PCChecker) PushPremise(premise string) {
 // 加入推理语句 (加入推理语句之前要先进行检查)
 func (pcChecker *PCChecker) PushInference(inference string) (bool, error) {
 	inferenceStructp, err := compileInference(inference)
+	if err != nil {
+		return false, err
+	}
 	inferenceStruct := *inferenceStructp
 	//然后检查inference
 	// TODO
