@@ -5,6 +5,7 @@ type Interface interface {
 	PushPremise(premise string)                   //无条件推入前提
 	PushInference(inference string) (bool, error) //如果推理语句能够加入,推理成功,如果不能够加入,推理失败
 	PopInference()                                //移除最后一条推理，如果推理序列为空,则不移除
+	CheckConclusion(conclusion string) bool       //检查结论是否达成
 	Len() int                                     //获取推理序列(包括前提的长度)
 	Get(index int) string                         //获取某个位置的语句
 }
