@@ -2,7 +2,6 @@ package pc
 
 import (
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 	"unicode"
@@ -80,7 +79,7 @@ func split_A_B_C(expr string) (A, B, C string, ok bool) {
 	state := 0
 	numLeftParenthesis := 0 //自动机使用的参数
 	ok = true
-	fmt.Println("process", expr)
+	// fmt.Println("process", expr)
 	for _, c := range expr {
 		switch state {
 		// 获取A

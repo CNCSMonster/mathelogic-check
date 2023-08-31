@@ -20,7 +20,7 @@ func (pcChecker *PCChecker) CheckConclusion(conclusion string) bool {
 		// 判断该推理是否符合要求
 		ok := true
 		for _, dep := range inf.depends {
-			if dep >= len(pcChecker.premise) {
+			if dep >= pcChecker.Len() {
 				ok = false
 				break
 			}

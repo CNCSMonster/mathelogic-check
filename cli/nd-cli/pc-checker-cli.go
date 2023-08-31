@@ -21,6 +21,7 @@ func pc_checker_cli() {
 }
 
 func PcCheckAction(ctx *cli.Context) error {
-	fmt.Println("gg")
+	fmt.Println("")
+
 	return nil
 }
