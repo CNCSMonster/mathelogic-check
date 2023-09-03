@@ -1,9 +1,5 @@
 package pc
 
-import (
-	"fmt"
-)
-
 // pc只有一种推理规则,蕴含规则 A,A->B
 // pc有三大公理:1.A->(B->A) 2.(A->(B->C)) -> (A->B)->(A->C) 3.
 // pc只有两大联结词:1.-> 2.!(ps,为了方便打,使用!作为否定联结词)
@@ -79,7 +75,7 @@ func (pcChecker *PCChecker) PushInference(inference string) (bool, error) {
 	// TODO
 	ok, err := pcChecker.checkInference(inferenceStruct)
 	if err != nil {
-		fmt.Println(err)
+		return false, err
 	}
 	if ok {
 		pcChecker.inferences = append(pcChecker.inferences, inferenceStruct.expr)

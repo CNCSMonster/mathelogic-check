@@ -74,106 +74,16 @@ func simplify_expr(base_expr string) string {
 
 // 分离模式 A->(B->C)中的 A,B,C
 func split_A_B_C(expr string) (A, B, C string, ok bool) {
-	A, B, C = "", "", ""
-	sb := strings.Builder{}
-	state := 0
-	numLeftParenthesis := 0 //自动机使用的参数
-	ok = true
-	// fmt.Println("process", expr)
-	for _, c := range expr {
-		switch state {
-		// 获取A
-		case 0:
-			if unicode.IsLetter(c) || c == '!' {
-				sb.WriteRune(c)
-			} else if c == '(' {
-				sb.WriteRune(c)
-				numLeftParenthesis += 1
-			} else if c == ')' && numLeftParenthesis > 0 {
-				sb.WriteRune(c)
-				numLeftParenthesis -= 1
-			} else if c == '-' && numLeftParenthesis == 0 {
-				A = sb.String()
-				sb = strings.Builder{}
-				state = 1
-			} else if c == '-' || c == '>' {
-				sb.WriteRune(c)
-			} else {
-				ok = false
-				break
-			}
-		// A,B中转
-		case 1:
-			if c == '>' {
-				state = 2
-			} else {
-				ok = false
-				break
-			}
-		// 进入(B->A)
-		case 2:
-			if c == '(' {
-				state = 3
-			} else {
-				ok = false
-				break
-			}
-		//准备B
-		case 3:
-			if unicode.IsLetter(c) || c == '!' {
-				sb.WriteRune(c)
-			} else if c == '(' {
-				sb.WriteRune(c)
-				numLeftParenthesis += 1
-			} else if c == ')' && numLeftParenthesis > 0 {
-				sb.WriteRune(c)
-				numLeftParenthesis -= 1
-			} else if c == '-' && numLeftParenthesis == 0 {
-				B = sb.String()
-				sb = strings.Builder{}
-				state = 4
-			} else if c == '-' || c == '>' {
-				sb.WriteRune(c)
-			} else {
-				ok = false
-				break
-			}
-		//B和第二个A的中转
-		case 4:
-			if c == '>' {
-				state = 5
-			} else {
-				ok = false
-				break
-			}
-		case 5:
-			if unicode.IsLetter(c) || c == '!' {
-				sb.WriteRune(c)
-			} else if c == '(' {
-				sb.WriteRune(c)
-				numLeftParenthesis += 1
-			} else if c == ')' && numLeftParenthesis > 0 {
-				sb.WriteRune(c)
-				numLeftParenthesis -= 1
-			} else if c == ')' && numLeftParenthesis == 0 {
-				C = sb.String()
-				state = 6
-			} else if c == '-' && numLeftParenthesis == 0 {
-				ok = false
-				break
-			} else if c == '-' || c == '>' {
-				sb.WriteRune(c)
-			} else {
-				ok = false
-				break
-			}
-		case 6:
-			// 到达终结状态后后面不应该存在字符
-			ok = false
-			break
-		}
+	A, B2C, ok := split_A_B_from_A2B(expr)
+	if !ok {
+		return "", "", "", false
 	}
-	return A, B, C, ok
+	B2C = simplify_expr(B2C)
+	B, C, ok2 := split_A_B_from_A2B(B2C)
+	if !ok2 {
+		return "", "", "", false
+	}
+	return A, B, C, true
 }
 
 // 从模式 A->B 中提取 A和B
@@ -189,7 +99,7 @@ func split_A_B_from_A2B(expr string) (A string, B string, ok bool) {
 		// 处理左串
 		// 处理left
 		case 1:
-			if unicode.IsLetter(c) || c == '!' {
+			if unicode.IsLetter(c) || unicode.IsDigit(c) || c == '!' || c == '$' {
 				sb.WriteRune(c)
 			} else if c == '(' {
 				num_left += 1
@@ -225,7 +135,7 @@ func split_A_B_from_A2B(expr string) (A string, B string, ok bool) {
 				}
 				ok = true
 				B = sb.String()
-			} else if unicode.IsLetter(c) || c == '!' {
+			} else if unicode.IsLetter(c) || unicode.IsDigit(c) || c == '!' || c == '$' {
 				sb.WriteRune(c)
 			} else if c == '(' {
 				num_left += 1
