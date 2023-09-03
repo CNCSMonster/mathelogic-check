@@ -14,7 +14,7 @@ func (pcChecker *PCChecker) checkInference(inference PCInference) (bool, error) 
 	return ok, nil
 }
 
-// 根据序号获取语句
+// 根据序号获取语句,获取的是符合语法格式的语句,包括涉及的规则和依赖
 func (pcChecker *PCChecker) get_expr(index int) (string, error) {
 	if index < len(pcChecker.premise) {
 		return pcChecker.premise[index], nil

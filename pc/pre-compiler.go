@@ -152,3 +152,16 @@ func split_A_B_from_A2B(expr string) (A string, B string, ok bool) {
 	}
 	return A, B, ok
 }
+
+// 从模式!A中提取A
+// A的文法为  S->(M)|T  , S->T[a-zA-Z] , T->[a-zA-Z]
+func extract_A_from_notA(notA string) (string, error) {
+	if len(notA) == 0 {
+		return notA, errors.New("empty str")
+	} else if []rune(notA)[0] != '!' {
+		return notA, errors.New("not a not A sentence")
+	}
+	notA = notA[1:]
+	notA = simplify_expr(notA)
+	return notA, nil
+}
