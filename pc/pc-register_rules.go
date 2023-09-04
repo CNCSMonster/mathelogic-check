@@ -34,13 +34,13 @@ type pcRule struct {
 	eqs  [][]*pcRuleAst
 }
 
-// 注册规则,如果注册成功返回nil,注册失败返回失败原因
-func (pcChecker *PCChecker) RegisterRule(rule string) error {
+// 注册规则,如果注册成功返回该规则所处的编号,注册失败返回失败原因
+func (pcChecker *PCChecker) RegisterRule(rule string) (int, error) {
 	cp := regexp.MustCompile("[\n\t ]")
 	rule = cp.ReplaceAllString(rule, "")
 	sentences := strings.Split(rule, ":")
 	if len(sentences) == 0 {
-		return errors.New("syntax error!")
+		return -1, errors.New("syntax error!")
 	}
 	// 首先检查原型,取出依赖
 	model := sentences[0]
@@ -48,18 +48,18 @@ func (pcChecker *PCChecker) RegisterRule(rule string) error {
 	ruleDeps := []int{}
 	if strings.Contains(model, "#") {
 		splits := strings.Split(model, "#")
-		if len(splits) >= 2 {
-			return errors.New("syntax error!")
+		if len(splits) > 2 {
+			return -1, errors.New("syntax error!")
 		}
 		model = splits[0]
 		depStrs := strings.Split(splits[1], ",")
 		for _, ds := range depStrs {
 			if ds[0] != '$' || len(ds) < 2 {
-				return errors.New("syntax error!")
+				return -1, errors.New("syntax error!")
 			} else {
 				dep, err := strconv.Atoi(ds[1:])
 				if err != nil {
-					return err
+					return -1, err
 				}
 				ruleDeps = append(ruleDeps, dep)
 			}
@@ -68,23 +68,23 @@ func (pcChecker *PCChecker) RegisterRule(rule string) error {
 	//
 	pcast, err := compilePcRuleModel2PcRuleAst(model)
 	if err != nil {
-		return err
+		return -1, err
 	}
 	// 对于等价规则进行提取
 	eqs := [][]pcRuleAst{}
 	for _, sentence := range sentences[1:] {
 		split := strings.Split(sentence, "=")
 		if len(split) != 2 {
-			return errors.New("syntax error!")
+			return -1, errors.New("syntax error!")
 		}
 		front, back := split[0], split[1]
 		past1, err := compilePcRuleModel2PcRuleAst(front)
 		if err != nil {
-			return fmt.Errorf(front, err)
+			return -1, fmt.Errorf(front, err)
 		}
 		past2, err2 := compilePcRuleModel2PcRuleAst(back)
 		if err2 != nil {
-			return fmt.Errorf(back, err2)
+			return -1, fmt.Errorf(back, err2)
 		}
 		eqs = append(eqs, []pcRuleAst{past1, past2})
 	}
@@ -111,15 +111,18 @@ func (pcChecker *PCChecker) RegisterRule(rule string) error {
 		// 如果仍然匹配,则接下来基于规则进行匹配
 		for _, eq := range eqs {
 			front, back := eq[0], eq[1]
-			if !comparePcRuleAstWithItem2Str(&front, &back, item2Str) {
+			fs := compileAst2Str(&front, item2Str)
+			bs := compileAst2Str(&back, item2Str)
+			fs, bs = simplify_expr(fs), simplify_expr(bs)
+			if fs != bs {
 				return false
 			}
 		}
-		return false
+		return true
 	}
 	// 注册新的检查函数
 	pcChecker.rules[len(pcChecker.rules)] = newCheckFunc
-	return nil
+	return len(pcChecker.rules) - 1, nil
 }
 
 // 把规则model表示式编译成pcRule对应的抽象语法树,编译失败返回失败error原因
@@ -152,6 +155,7 @@ func compilePcRuleModel2PcRuleAst(ruleModel string) (pcRuleAst, error) {
 		out.kind = 2
 		out.left = &it
 		out.right = &it2
+		return out, nil
 	}
 	// 终点规则
 	if ruleModel[0] == '$' {
@@ -161,13 +165,13 @@ func compilePcRuleModel2PcRuleAst(ruleModel string) (pcRuleAst, error) {
 		}
 		out.kind = 1
 		out.item = item
-		return out, err
+		return out, nil
 	} else {
 		return out, errors.New("syntax error!")
 	}
 }
 
-// 检查expr是否符合pcModel
+// 检查expr是否符合pcModel,要求,输入的expre必须是经过化简去除至少最外层多余的括号的
 func compareRuleAstWithExprWithStrMap(past *pcRuleAst, expr string, item2Strs map[int]string) bool {
 	if past == nil {
 		return false
@@ -175,7 +179,7 @@ func compareRuleAstWithExprWithStrMap(past *pcRuleAst, expr string, item2Strs ma
 	// 比较终止情况,到终点了
 	if past.kind == 1 {
 		if target, ok := item2Strs[past.item]; !ok {
-			item2Strs[past.item] = target
+			item2Strs[past.item] = expr
 			return true
 		} else {
 			return target == expr
@@ -206,17 +210,24 @@ func compareRuleAstWithExprWithStrMap(past *pcRuleAst, expr string, item2Strs ma
 	}
 }
 
-func comparePcRuleAstWithItem2Str(ast1, ast2 *pcRuleAst, item2Strs map[int]string) bool {
-	if ast1 == ast2 {
-		return true
+// 使用量表由ast到字符串,如果得到的命题最外层为->类型,则会带上一对括号,比如(A->B)
+func compileAst2Str(ast *pcRuleAst, item2Strs map[int]string) string {
+	if ast == nil {
+		return ""
 	}
-	if ast1.kind != ast2.kind {
-		return false
+	if ast.kind == 1 {
+		return item2Strs[ast.item]
+	} else if ast.kind == 0 {
+		return strings.Join([]string{"!", compileAst2Str(ast.left, item2Strs)}, "")
+	} else if ast.kind == 2 {
+		sb := strings.Builder{}
+		sb.WriteRune('(')
+		sb.WriteString(compileAst2Str(ast.left, item2Strs))
+		sb.WriteString("->")
+		sb.WriteString(compileAst2Str(ast.right, item2Strs))
+		sb.WriteString(")")
+		return sb.String()
+	} else {
+		panic(ast.kind)
 	}
-	if ast1.kind == 1 {
-		s1, ok1 := item2Strs[ast1.item]
-		s2, ok2 := item2Strs[ast2.item]
-		return ok1 && ok2 && (s1 == s2)
-	}
-	return comparePcRuleAstWithItem2Str(ast1.left, ast2.left, item2Strs) && comparePcRuleAstWithItem2Str(ast1.right, ast2.right, item2Strs)
 }
